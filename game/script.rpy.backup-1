@@ -1,0 +1,361 @@
+﻿# script.rpy — Clair Obscur: Expedition 33 — Ashes of the Manor (VN Spinoff)
+# Ready-to-run: no custom images required. Uses 'scene black' + narration.
+# Lore alignment from public summaries: Verso dies saving Alicia; Alicia left burned & mute.
+
+define a = Character("Alicia", what_prefix="“", what_suffix="”")
+define v = Character("Verso", what_prefix="“", what_suffix="”")
+define r = Character("Renoir", what_prefix="“", what_suffix="”")
+define al = Character("Aline", what_prefix="“", what_suffix="”")
+define n = Character(None)  # narrator
+
+# === GLOBAL VARIABLES ===
+default Heat = 0
+default VoiceHP = 3
+default TRUST_VERSO = 0
+default VENT_LOCK = False
+default TANK_ON = False
+default LETTER_READ = False
+default COAT_USED = False
+default loops_completed = 0
+
+# visited trackers (to avoid double counting)
+default visited_gallery = False
+default visited_kitchen = False
+default visited_library = False
+default visited_boiler = False
+default saw_studio = False
+
+# rescue flags
+default saved_aline = False
+default saved_renoir = False
+default saved_staff = False
+
+# utility label: clamp Heat
+label _inc_heat(amount=0):
+    $ Heat = max(0, Heat + amount)
+    return
+
+label _dec_voice(amount=1):
+    $ VoiceHP = max(0, VoiceHP - amount)
+    return
+
+# === START ===
+label start:
+    scene black with fade
+    $ Heat = 15
+    $ VoiceHP = 3
+    $ TRUST_VERSO = 0
+    $ VENT_LOCK = False
+    $ TANK_ON = False
+    $ LETTER_READ = False
+    $ COAT_USED = False
+    $ loops_completed = 0
+    $ visited_gallery = visited_kitchen = visited_library = visited_boiler = False
+    $ saved_aline = saved_renoir = saved_staff = False
+    $ saw_studio = False
+
+    n "{b}In medias res—Koridor Timur, The Manor.{/b}"
+    n "Sirene meraung. Asap memagut tenggorokan. Lampu gantung retak."
+    a "Panas... bau terpupus. Verso—di mana kau?"
+    $ Heat += 5
+
+    menu:
+        n "{i}Ke mana dulu?{/i}\n[Heat:[Heat]] [VoiceHP:[VoiceHP]]"
+        "Ke studio musik (mencari Verso)":
+            $ TRUST_VERSO += 1
+            $ saw_studio = True
+            jump scene_studio_first
+        "Ke dapur (ambil pemadam)":
+            jump scene_kitchen_false_start
+        "Telepon Ayah (Renoir)":
+            jump scene_call_renoir
+
+label scene_studio_first:
+    scene black
+    n "Studio musik remang. Sebagian piano hangus, partitur terbuka bertajuk 'For Those Who Come After'."
+    a "(Nada-nada ini selalu memanggilku...)"
+    $ TRUST_VERSO += 1
+    $ Heat += 3
+    n "Dari balik dinding, dengung api—bukan dari dapur."
+    jump hub_1
+
+label scene_kitchen_false_start:
+    scene black
+    n "Dapur. Api kompor membesar."
+    a "Pe—ma—dam!"
+    $ VoiceHP = max(0, VoiceHP - 1)
+    $ Heat = max(0, Heat - 5)
+    n "Api kompor padam."
+    n "{i}Retakan seperti kanvas menjalari layar...{/i}"
+    n "Dari arah galeri, jilatan api {b}menyala lagi{/b}—lebih parah."
+    $ Heat += 10
+    jump hub_1
+
+label scene_call_renoir:
+    scene black
+    n "Sambungan telepon berderak. Statis menyayat telinga."
+    r "Ali—ci— ... ja—ngan ... ve—nt ... ba—wah ..."
+    a "(Vent bawah tanah... tutup?)"
+    $ Heat += 3
+    jump hub_1
+
+# === HUB NAVIGATION ===
+label hub_1:
+    if Heat >= 60:
+        jump setpiece_1
+
+    scene black
+    n "{b}Grand Hall{/b}. Empat arah terbuka di tengah asap.\n[Heat:[Heat]] [VoiceHP:[VoiceHP]] [Trust:[TRUST_VERSO]]"
+    menu:
+        "Pergi ke Galeri Aline":
+            jump scene_gallery_loop1
+        "Pergi ke Dapur / Valve Atap":
+            jump scene_kitchen_valve
+        "Pergi ke Perpustakaan":
+            jump scene_library_loop2
+        "Pergi ke Ruang Boiler":
+            jump scene_boiler_loop3
+        "Pergi ke Studio Musik (opsional)":
+            jump scene_studio_optional
+        "Lanjut (cari sumber api)":
+            jump setpiece_1
+
+label scene_gallery_loop1:
+    scene black
+    if not visited_gallery:
+        n "{b}Galeri Aline{/b}. Pigmen retak, bingkai menghitam."
+        al "Jika warna bisa menghidupkan kembali... apa salahnya, Ren?"
+        r "Yang hidup tak boleh digantikan lukisan."
+        a "(Vent bawah tanah... harus kututup.)"
+        menu:
+            "Tutup intake udara bawah tanah (vent)":
+                $ VENT_LOCK = True
+                $ loops_completed += 1
+                $ visited_gallery = True
+                $ Heat = max(0, Heat - 10)
+                a "(Maaf, Ibu.)"
+            "Abaikan (berisiko)":
+                $ visited_gallery = True
+                $ Heat += 5
+        jump hub_1
+    else:
+        n "Galeri kembali diliputi asap tipis."
+        jump hub_1
+
+label scene_kitchen_valve:
+    scene black
+    if not visited_kitchen:
+        n "{b}Dapur{/b}. Valve suplai air atap terpasang rapuh."
+        if LETTER_READ:
+            n "Kunci teknik dari perpustakaan pas di lubang valve."
+            menu:
+                "Buka valve sekarang (aktifkan sprinkle atap)":
+                    $ TANK_ON = True
+                    $ visited_kitchen = True
+                    $ Heat = max(0, Heat - 8)
+                    n "Air mengalir. Tetesan rintik membasahi langit-langit."
+                "Tunda":
+                    $ visited_kitchen = True
+                    $ Heat += 3
+        else:
+            menu:
+                "Paksa putar valve (sulit)":
+                    $ success = (TRUST_VERSO >= 1)
+                    if success:
+                        $ TANK_ON = True
+                        $ visited_kitchen = True
+                        $ Heat = max(0, Heat - 6)
+                        n "Dengan tenaga putus asa, valve berputar. Air mengalir."
+                    else:
+                        n "Valve macet. Sepertinya butuh kunci teknik dari perpustakaan."
+                        $ visited_kitchen = True
+                        $ Heat += 4
+                "Panggil staf (memaksa bicara)":
+                    $ VoiceHP = max(0, VoiceHP - 1)
+                    if VoiceHP >= 1:
+                        n "Beberapa staf merespons, siap membantu jalur evakuasi."
+                        $ saved_staff = True
+                        $ Heat = max(0, Heat - 2)
+                    else:
+                        n "Suaramu habis. Tenggorokan perih."
+                        $ Heat += 2
+    else:
+        n "Valve atap sudah kau cek."
+    jump hub_1
+
+label scene_library_loop2:
+    scene black
+    if not visited_library:
+        n "{b}Perpustakaan{/b}. Di balik buku perdebatan seni, ada surat terselip."
+        r "Jika kubiarkan kau tinggal, kanvas memakan waktumu. Jika kuminta pulang, kau membenciku."
+        r "Aku akan tinggalkan lampu menyala—kalau kau pilih pulang."
+        $ LETTER_READ = True
+        $ loops_completed += 1
+        $ visited_library = True
+        n "Kau juga menemukan {i}kunci teknik{/i}."
+    else:
+        n "Rak buku berderit. Surat sudah kau baca."
+    jump hub_1
+
+label scene_boiler_loop3:
+    scene black
+    if not visited_boiler:
+        n "{b}Ruang Boiler{/b}. Panas berdesis. Di tangga, {i}jam saku Verso{/i} terjatuh."
+        v "Kalau ada bahaya, aku duluan."
+        a "Janji pegang tanganku."
+        $ loops_completed += 1
+        $ visited_boiler = True
+        menu:
+            "Kurangi tekanan boiler":
+                $ Heat = max(0, Heat - 8)
+                n "Tekanan turun, dentum mereda."
+            "Alihkan pasokan air ke sayap timur":
+                $ TANK_ON = True
+                $ Heat = max(0, Heat - 4)
+                n "Katup beralih. Sayap timur akan lebih basah."
+        menu:
+            "Ambil mantel basah di jemuran (perlindungan)":
+                $ COAT_USED = True
+                n "Kau menyambar mantel—dingin dan berat oleh air."
+            "Biarkan saja":
+                pass
+    else:
+        n "Boiler mendesis lebih jinak."
+    jump hub_1
+
+label scene_studio_optional:
+    scene black
+    n "{b}Studio Musik{/b}. Partitur 'For Those Who Come After' terbuka."
+    if not saw_studio:
+        $ TRUST_VERSO += 1
+        $ saw_studio = True
+        n "Nada yang patah menyisakan janji."
+    else:
+        n "Keheningan menempel di tuts."
+    if VENT_LOCK and TANK_ON:
+        $ Heat = max(0, Heat - 2)
+    jump hub_1
+
+# === SET-PIECE 1: Sumber Api Sesungguhnya ===
+label setpiece_1:
+    scene black with dissolve
+    n "{b}Jebol dari arah Galeri.{/b} Api bukan dari dapur—{i}false start{/i} terbongkar."
+    if VoiceHP > 0:
+        menu:
+            "Paksa panggil Ayah (mengorbankan suara)":
+                $ VoiceHP = max(0, VoiceHP - 1)
+                n "Renoir muncul dari kepulan asap, membantu menggeser lemari."
+                $ Heat = max(0, Heat - 5)
+            "Tetap diam dan cari penyangga":
+                if TRUST_VERSO >= 1:
+                    n "Kau mengingat trik Verso menahan beban dengan patung."
+                    $ Heat = max(0, Heat - 3)
+                else:
+                    n "Kau ragu—api merayap."
+                    $ Heat += 3
+    else:
+        n "Tenggorokanmu perih. Hanya isyarat tangan yang tersisa."
+        $ Heat += 2
+    jump setpiece_2
+
+# === SET-PIECE 2: Penyelamatan Terbatas ===
+label setpiece_2:
+    scene black
+    n "{b}Pilih dua prioritas penyelamatan.{/b}"
+    $ picks = 0
+    while picks < 2:
+        menu:
+            "Selamatkan Aline":
+                if not saved_aline:
+                    $ saved_aline = True
+                    $ picks += 1
+                    n "Aline menutup lorong api dengan kain basah raksasa; pigmen menyobek."
+                    $ Heat += 5
+                    $ Heat = max(0, Heat - 10)
+                else:
+                    n "Aline sudah bersama kalian."
+            "Selamatkan Renoir":
+                if not saved_renoir:
+                    $ saved_renoir = True
+                    $ picks += 1
+                    n "Renoir menarik lemari berat, membuka jalan alternatif."
+                    $ Heat = max(0, Heat - 4)
+                else:
+                    n "Renoir sudah selamat."
+            "Selamatkan Staf / siapkan balkon timur":
+                if not saved_staff:
+                    $ saved_staff = True
+                    $ picks += 1
+                    n "Para staf menyiapkan jalur ke balkon timur."
+                    $ Heat = max(0, Heat - 2)
+                else:
+                    n "Jalur balkon sudah disiapkan."
+    jump climax_stairs
+
+# === KLIMAKS: Tangga Utama ===
+label climax_stairs:
+    scene black with fade
+    n "{b}Tangga utama{/b}. Langit-langit runtuh, pilar terbakar. Jalan keluar menyempit."
+    v "Aku tahan balok ini. Kau lari!"
+    if COAT_USED:
+        n "Mantel basah di tanganmu meneteskan air."
+    if TRUST_VERSO >= 1:
+        a "Ver—so, jangan {i}(nafas berat){/i}..."
+    else:
+        a "(Aku harus memilih sekarang.)"
+
+    menu:
+        "Panggil Ayah/Ibu, {b}angkat bersama{/b}!":
+            jump branch_good_check
+        "Aku yang tahan, {b}kau lari{/b}! (paksa bicara)":
+            $ VoiceHP = max(0, VoiceHP - 1)
+            jump branch_bad_check
+        "Tukar mantel—{b}kau di depanku{/b} (percaya Verso)":
+            jump branch_true_check
+
+# === BRANCH CHECKS ===
+label branch_good_check:
+    if (saved_renoir or saved_aline) and VENT_LOCK and TANK_ON:
+        jump ending_good
+    else:
+        jump ending_bad
+
+label branch_bad_check:
+    if VoiceHP <= 0 or (not VENT_LOCK and not TANK_ON):
+        jump ending_bad
+    else:
+        # Without full mitigation, still collapses by design
+        jump ending_bad
+
+label branch_true_check:
+    if loops_completed >= 3 and (VENT_LOCK or TANK_ON) and TRUST_VERSO >= 1 and COAT_USED:
+        jump ending_true
+    else:
+        jump ending_bad
+
+# === ENDINGS ===
+label ending_good:
+    scene black with fade
+    n "{b}GOOD END — Hearth Unscorched{/b}"
+    n "Renoir dan—jika sempat—Aline, mengangkat balok bersama Verso. Jalur ke balkon timur terbuka; sprinkle atap mereda."
+    n "Manor rapuh, namun {i}tidak{/i} habis."
+    a "(Aku masih bisa berbisik...)"
+    n "— Warna tak lagi memakan nyawa."
+    return
+
+label ending_bad:
+    scene black with fade
+    n "{b}BAD END — Ashes Together{/b}"
+    n "Tangga runtuh menutup jalan. Api melahap Grand Hall."
+    n "Jam saku Verso jatuh—jarum berhenti."
+    n "Dalam abu, tak ada lagi janji; hanya bingkai kosong."
+    return
+
+label ending_true:
+    scene black with fade
+    n "{b}TRUE END — For Those Who Come After{/b}"
+    n "Verso menahan balok menyala. Mantel basah melindungi langkahmu. Ledakan kecil dari vent mengguncang."
+    n "Rumah habis dilalap api. Verso tiada."
+    a "(Aku menarik napas—tanpa suara. Namamu tinggal di sela jeda.)"
+    n "Aline menatap kosong; Renoir menggenggam jam retak."
+    return
